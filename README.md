@@ -12,3 +12,4 @@ Weather Station Component
 - Solar Charger Panel
 
 Upload Sensor Data to Personal Weather Station on WUnderground.com
+https://www.wunderground.com/personal-weather-station/dashboard?ID=IOMKRET2
