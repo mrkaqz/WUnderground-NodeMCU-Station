@@ -11,5 +11,5 @@ Weather Station Component
 - Lithium-Polymer Battery
 - Solar Charger Panel
 
-Upload Sensor Data to Personal Weather Station on WUnderground.com
+Upload Sensor Data to Personal Weather Station on WUnderground.com <br>
 https://www.wunderground.com/personal-weather-station/dashboard?ID=IOMKRET2
