@@ -1,12 +1,31 @@
 #include <ESP8266WiFi.h>
+
 #include <ArduinoJson.h>
 #include <TextFinder.h>
 
+#include "ThingSpeak.h"
+
+#include <Wire.h>
+#include "SSD1306.h"
+//#include "images.h"
+
+// OLED
+const int I2C_DISPLAY_ADDRESS = 0x3c;
+const int SDA_PIN = D3;
+const int SDC_PIN = D5;
+
+char showLine[3][25];
+int showCount = 0;
+char buff[25];
+char pre[25];
+char post[25];
+
+SSD1306Wire display(I2C_DISPLAY_ADDRESS, SDA_PIN, SDC_PIN);
 
 // Server Yahoo
 IPAddress server(72,30,202,51);
 
-const char* ssid     = "RonAP"; 
+const char* ssid     = "TripMate-Ron"; 
 const char* password = "1234567890";
 const int sleepTimeS = 600; //18000 for Half hour, 300 for 5 minutes etc.
 
@@ -17,12 +36,20 @@ char WEBPAGE [] = "GET /weatherstation/updateweatherstation.php?";
 char ID [] = "IOMKRET2";
 char PASSWORD [] = "4j19zv3n";
 
+// ThingSpeak
+
+unsigned long myChannelNumber = 178977;
+const char * myWriteAPIKey = "5KY2PPF182P6T71N";
+
+
 WiFiClient client;
+IPAddress ip;
 
 TextFinder  finder( client );  
 
 char place[50];
 char hum[30];
+
 
 float tempf = 0;
 float tempc = 0;
@@ -32,48 +59,98 @@ float pressure =0;
 float windspeed=0;
 int winddir=0;
 
+ADC_MODE(ADC_VCC);
+
+float VCC=0.00f;
+
+int counter = 0;
+char state[5] = "";
+
 void setup() {
 
   Serial.begin(115200);
+  display.init();
 
+  display.clear();
+  display.display();
+
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_CENTER);
+  display.setContrast(255);
+  display.flipScreenVertically();
   
   delay(1000);
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
+
+  int counter = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
+    
+    display.clear();
+    display.drawString(64, 15, "Connecting to WiFi");
+    display.drawProgressBar(10, 40, 100, 10, counter*5);
+    display.display();
+    counter++;
+    if (counter > 20) {counter=0;} 
+    delay(1000);
   }
+
+  ip = WiFi.localIP();
+  
   Serial.println();
+  display.clear();
+  display.drawString(64, 15, "IP Address");
+  display.drawString(64, 30, String(ip[0])+"."+String(ip[1])+"."+String(ip[2])+"."+String(ip[3]));
+  display.display();
+  delay(1000);
+  display.clear();
+  
+  ThingSpeak.begin(client);
+  
 
 }
 
 void loop() {
+  
 
+
+  Serial.println("Connect to Yahoo Weather...");
+  screenAdd("Connecting to Y!Weather");
+  
 if (client.connect(server, 80))
   {
     // Call Wetter-API
     // w: ID from your City
     // http://weather.yahooapis.com/forecastrss?w=12893459&u=c
     ///
-    Serial.println("Connect to Yahoo Weather...");
+    strcpy(state,"P");
     client.println("GET /v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22Nonthaburi%2CTH%22)&format=xml&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys HTTP/1.0");
     client.println("HOST:query.yahooapis.com\n\n");
     client.println();
     Serial.println("Connected...");
-
-    
+    screenAdd("Connected");
+     
   } 
   else
   {
+    strcpy(state,"F");
     Serial.println(" connection failed");
+    screenAdd("Failed");
+    
   } 
+
+  delay(500);
 
   if (client.connected())
   {  
-
+    
+    screenAdd("Get Data from Yahoo!");
+    
+    
     // Wind Direction
     if(finder.find("direction=") )
     {
@@ -114,11 +191,6 @@ if (client.connect(server, 80))
      Serial.print("Temp F:  ");
      Serial.println(tempf);
     }
-
-
-
-  
-
     
          
   // END XML
@@ -128,7 +200,7 @@ if (client.connect(server, 80))
     Serial.println("Disconnected"); 
   }
 
-
+  screenAdd("Connect to WU");
   
 // WU Section
 
@@ -160,6 +232,11 @@ if (client.connect(server, 80))
   Serial.print(windspeed);
   Serial.println(" mph");  
 
+  screenAdd("Check Sensor Data");
+  screenAdd("Post Data to WU");
+  
+
+  
   //Send data to Weather Underground  
 
   Serial.println("Send to WU Sensor Values");
@@ -170,7 +247,9 @@ if (client.connect(server, 80))
   WiFiClient client;
   const int httpPort = 80;
   if (!client.connect(host, httpPort)) {
-    Serial.println("connection failed");
+    strcpy(state,"F");
+    Serial.println(" WU Connection Failed");
+    screenAdd(" WU Connection Failed");
     return;
   }
   
@@ -206,14 +285,40 @@ if (client.connect(server, 80))
   // Read all the lines of the reply from server and print them to Serial
   while(client.available()){
     String line = client.readStringUntil('\r');
+    Serial.print("WU Read Data");
     Serial.print(line);
   }
   
   Serial.println();
   Serial.println("closing connection");
 
-  sleepMode(); 
 
+  dtostrf(tempc,4,2,buff);
+  strcpy(pre,"Temp C: ");
+  strcpy(post,buff);
+  screenAdd(strcat(pre,post));
+  
+
+  dtostrf(humidity,4,2,buff);
+  strcpy(pre,"Humidity %: ");
+  strcpy(post,buff);
+  screenAdd(strcat(pre,post));
+
+
+  dtostrf(pressure,4,2,buff);
+  strcpy(pre,"Pressure InHg: ");
+  strcpy(post,buff);
+  screenAdd(strcat(pre,post));
+
+
+
+  VCC = ESP.getVcc();
+  Serial.print("Supply Voltage = ");
+  Serial.println(VCC/1024.00f);
+
+  ThingSpeak.writeField(myChannelNumber, 1, VCC/1024.00f, myWriteAPIKey);
+  display.display();
+  sleepMode(); 
 
 }
 
@@ -234,5 +339,38 @@ void sleepMode(){
   Serial.println("Sleeping...");
   delay(sleepTimeS*1000);
   //ESP.deepSleep(sleepTimeS * 1000000);
+}
+
+void screenAdd(char text[25]) {
+  display.setFont(ArialMT_Plain_10);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  
+  //Top
+  display.clear();
+  display.drawString(1, 1, "IP:");
+  display.drawString(25, 1, String(ip[0])+"."+String(ip[1])+"."+String(ip[2])+"."+String(ip[3]));
+  display.drawString(120, 1, String(state[0]));
+
+  // Line move up
+  if (showCount==0){
+    strcpy(showLine[0], text);  
+  }else if (showCount==1){
+    strcpy(showLine[1], text);  
+  }else if (showCount==2){
+    strcpy(showLine[2], text); 
+  }else{
+    strcpy(showLine[0], showLine[1]);
+    strcpy(showLine[1], showLine[2]);
+    strcpy(showLine[2], text);
+  }
+  // Content
+  display.drawString(5, 15, showLine[0]);
+  display.drawString(5, 30, showLine[1]);
+  display.drawString(5, 45, showLine[2]);
+  
+  display.display();
+  showCount++;
+  delay(1000);
+  
 }
 
