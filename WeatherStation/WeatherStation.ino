@@ -64,7 +64,7 @@ ADC_MODE(ADC_VCC);
 float VCC=0.00f;
 
 int counter = 0;
-char state[5] = "";
+char state[5] = "P";
 
 void setup() {
 
@@ -127,7 +127,6 @@ if (client.connect(server, 80))
     // w: ID from your City
     // http://weather.yahooapis.com/forecastrss?w=12893459&u=c
     ///
-    strcpy(state,"P");
     client.println("GET /v1/public/yql?q=select%20*%20from%20weather.forecast%20where%20woeid%20in%20(select%20woeid%20from%20geo.places(1)%20where%20text%3D%22Nonthaburi%2CTH%22)&format=xml&env=store%3A%2F%2Fdatatables.org%2Falltableswithkeys HTTP/1.0");
     client.println("HOST:query.yahooapis.com\n\n");
     client.println();
