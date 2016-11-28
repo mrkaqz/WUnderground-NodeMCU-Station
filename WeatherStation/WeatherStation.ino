@@ -1,36 +1,49 @@
 #include <ESP8266WiFi.h>
-
 #include <ArduinoJson.h>
 #include <TextFinder.h>
-
 #include "ThingSpeak.h"
-
 #include <Wire.h>
+#include <BME280I2C.h>
 #include "SSD1306.h"
 //#include "images.h"
 
-// OLED
+/////////////////// OLED
 const int I2C_DISPLAY_ADDRESS = 0x3c;
 const int SDA_PIN = D3;
-const int SDC_PIN = D5;
+const int SDC_PIN = D4;
 
 char showLine[3][25];
 int showCount = 0;
 char buff[25];
 char pre[25];
 char post[25];
+int errorCount = 0;
 
 SSD1306Wire display(I2C_DISPLAY_ADDRESS, SDA_PIN, SDC_PIN);
 
-// Server Yahoo
-IPAddress server(72,30,202,51);
-
-const char* ssid     = "TripMate-Ron"; 
-const char* password = "1234567890";
-const int sleepTimeS = 600; //18000 for Half hour, 300 for 5 minutes etc.
+/////////////////// Server Yahoo 
+// IPAddress server(72,30,202,51);
 
 
-///////////////Weather//////////////////////// 
+///////////////// Wifi
+const char* ssid     = "mixen-ap-f2"; 
+const char* password = "mixensensagri";
+WiFiClient client;
+IPAddress ip;
+
+/////////////// BME280
+
+BME280I2C bme; 
+bool metric = false;
+
+/* ==== Prototypes ==== */
+/* === Print a message to stream with the temp, humidity and pressure. === */
+void printBME280Data(Stream * client);
+/* === Print a message to stream with the altitude, and dew point. === */
+void printBME280CalculatedData(Stream* client);
+/* ==== END Prototypes ==== */
+
+///////////////Weather UnderGround 
 char host [] = "weatherstation.wunderground.com";  
 char WEBPAGE [] = "GET /weatherstation/updateweatherstation.php?";
 char ID [] = "IOMKRET2";
@@ -42,35 +55,36 @@ unsigned long myChannelNumber = 178977;
 const char * myWriteAPIKey = "5KY2PPF182P6T71N";
 
 
-WiFiClient client;
-IPAddress ip;
-
 TextFinder  finder( client );  
 
 char place[50];
 char hum[30];
-
-
 float tempf = 0;
 float tempc = 0;
 float humidity =0;
 float dewptf =0;
+float dewptc =0;
 float pressure =0;
 float windspeed=0;
 int winddir=0;
-
-ADC_MODE(ADC_VCC);
-
-float VCC=0.00f;
-
+const int sleepTimeS = 300              ; //18000 for Half hour, 300 for 5 minutes etc.
 int counter = 0;
 char state[5] = "P";
 
 void setup() {
 
-  Serial.begin(115200);
-  display.init();
+  Serial.begin(115200);  
 
+  // BME280 Init
+  Wire.begin(0,2);
+  while(!Serial) {} // Wait
+  while(!bme.begin()){
+    Serial.println("Could not find BME280 sensor!");
+    delay(1000);
+  }
+  
+  // OLED Init
+  display.init();
   display.clear();
   display.display();
 
@@ -81,6 +95,8 @@ void setup() {
   
   delay(1000);
   Serial.println();
+  
+  // Wifi Init
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
@@ -108,15 +124,19 @@ void setup() {
   display.display();
   delay(1000);
   display.clear();
-  
+
+  // Thingspeak Init 
   ThingSpeak.begin(client);
-  
+
 
 }
 
 void loop() {
-  
 
+
+  strcpy(state,"P");
+
+/* Get Yahoo Weather Data
 
   Serial.println("Connect to Yahoo Weather...");
   screenAdd("Connecting to Y!Weather");
@@ -139,6 +159,7 @@ if (client.connect(server, 80))
     strcpy(state,"F");
     Serial.println(" connection failed");
     screenAdd("Failed");
+    errorCount++;
     
   } 
 
@@ -198,40 +219,47 @@ if (client.connect(server, 80))
   {
     Serial.println("Disconnected"); 
   }
+*/
 
-  screenAdd("Connect to WU");
+// BME Read
+  
+  screenAdd("Read Sensor Data");
+  
+  float temp(NAN), hum(NAN), pres(NAN);
+  uint8_t pressureUnit(2);                                           // unit: B000 = Pa, B001 = hPa, B010 = Hg, B011 = atm, B100 = bar, B101 = torr, B110 = N/m^2, B111 = psi
+  bme.read(pres, temp, hum, metric, pressureUnit);                   // Parameters: (float& pressure, float& temp, float& humidity, bool celsius = false, uint8_t pressureUnit = 0x0)
+
+  tempf= temp;
+  humidity= hum;
+  pressure= pres;
   
 // WU Section
 
-  //float tempf = 30; 
+  screenAdd("Connect to WU"); 
+
   tempc =  ((tempf - 32)/9)*5;
   //float tempf =  (tempc * 9.0)/ 5.0 + 32.0; 
   //float humidity = 28; 
   dewptf = (dewPoints(tempf, humidity)); 
-
+  dewptc = ((dewptf - 32)/9)*5;
+  
   //check sensor data
   Serial.println("+++++++++++++++++++++++++");
-  Serial.print("tempF= ");
-  Serial.print(tempf);
-  Serial.println(" *F");
-  Serial.print("tempC= ");
-  Serial.print(tempc);
-  Serial.println(" *C");
-  Serial.print("dew point= ");
+  Serial.print("temp *F = ");
+  Serial.println(tempf);
+  Serial.print("temp *C = ");
+  Serial.println(tempc);
+  Serial.print("dew point *F= ");
   Serial.print(dewptf);
-  Serial.println(" *F");
-  Serial.print("humidity= ");
+  Serial.print("humidity % = ");
   Serial.println(humidity);
-  Serial.print("Pressure= ");
-  Serial.print(pressure);
-  Serial.println(" In Hg");
-  Serial.print("Wind Direction= ");
-  Serial.println(winddir);
-  Serial.print("Wind Speed= ");
-  Serial.print(windspeed);
-  Serial.println(" mph");  
+  Serial.print("Pressure inHg= ");
+  Serial.println(pressure);
+  //Serial.print("Wind Direction = ");
+  //Serial.println(winddir);
+  //Serial.print("Wind Speed mph = ");
+  //Serial.println(windspeed);
 
-  screenAdd("Check Sensor Data");
   screenAdd("Post Data to WU");
   
 
@@ -247,6 +275,7 @@ if (client.connect(server, 80))
   const int httpPort = 80;
   if (!client.connect(host, httpPort)) {
     strcpy(state,"F");
+    errorCount++;
     Serial.println(" WU Connection Failed");
     screenAdd(" WU Connection Failed");
     return;
@@ -264,10 +293,10 @@ if (client.connect(server, 80))
   url += dewptf;
   url += "&humidity=";
   url += humidity;
-  url += "&winddir=";
-  url += winddir;
-  url += "&windspeedmph=";
-  url += windspeed;
+//  url += "&winddir=";
+//  url += winddir;
+//  url += "&windspeedmph=";
+//  url += windspeed;
   url += "&baromin=";
   url += pressure;
   url += "&weather=&clouds=&softwaretype=Arduino-ESP8266&action=updateraw";
@@ -305,17 +334,20 @@ if (client.connect(server, 80))
 
 
   dtostrf(pressure,4,2,buff);
-  strcpy(pre,"Pressure InHg: ");
+  strcpy(pre,"Pressure inHg: ");
   strcpy(post,buff);
   screenAdd(strcat(pre,post));
 
+  // Thingspeak
+
+  ThingSpeak.setField(1,tempc);
+  ThingSpeak.setField(2,humidity);
+  ThingSpeak.setField(3,pressure);
+  ThingSpeak.setField(4,dewptc);
+
+  ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);  
 
 
-  VCC = ESP.getVcc();
-  Serial.print("Supply Voltage = ");
-  Serial.println(VCC/1024.00f);
-
-  ThingSpeak.writeField(myChannelNumber, 1, VCC/1024.00f, myWriteAPIKey);
   display.display();
   sleepMode(); 
 
@@ -336,8 +368,8 @@ double dewPoints(double tempf, double humidity) //Calculate dew Point
 
 void sleepMode(){
   Serial.println("Sleeping...");
-  delay(sleepTimeS*1000);
-  //ESP.deepSleep(sleepTimeS * 1000000);
+  //delay(sleepTimeS*1000);
+  ESP.deepSleep(sleepTimeS * 1000000);
 }
 
 void screenAdd(char text[25]) {
@@ -348,7 +380,8 @@ void screenAdd(char text[25]) {
   display.clear();
   display.drawString(1, 1, "IP:");
   display.drawString(25, 1, String(ip[0])+"."+String(ip[1])+"."+String(ip[2])+"."+String(ip[3]));
-  display.drawString(120, 1, String(state[0]));
+  display.drawString(100, 1, String(state[0]));
+  display.drawString(110, 1, String(errorCount));
 
   // Line move up
   if (showCount==0){
