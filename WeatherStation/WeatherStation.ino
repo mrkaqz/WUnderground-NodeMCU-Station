@@ -12,7 +12,7 @@ const int I2C_DISPLAY_ADDRESS = 0x3c;
 const int SDA_PIN = D3;
 const int SDC_PIN = D4;
 
-char showLine[3][25];
+char showLine[4][25];
 int showCount = 0;
 char buff[25];
 char pre[25];
@@ -75,14 +75,6 @@ void setup() {
 
   Serial.begin(115200);  
 
-  // BME280 Init
-  Wire.begin(0,2);
-  while(!Serial) {} // Wait
-  while(!bme.begin()){
-    Serial.println("Could not find BME280 sensor!");
-    delay(1000);
-  }
-  
   // OLED Init
   display.init();
   display.clear();
@@ -91,11 +83,11 @@ void setup() {
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setContrast(255);
-  display.flipScreenVertically();
-  
+  display.flipScreenVertically();  
   delay(1000);
   Serial.println();
-  
+
+ 
   // Wifi Init
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -124,6 +116,17 @@ void setup() {
   display.display();
   delay(1000);
   display.clear();
+
+  // BME280 Init
+  Wire.begin(0,2);
+  screenAdd("BME280 Init");
+  while(!Serial) {} // Wait
+  while(!bme.begin()){
+    Serial.println("Could not find BME280 sensor!");
+    screenAdd("BME280 Error");
+    delay(1000);
+  }
+
 
   // Thingspeak Init 
   ThingSpeak.begin(client);
@@ -239,11 +242,10 @@ if (client.connect(server, 80))
 
   tempc =  ((tempf - 32)/9)*5;
   //float tempf =  (tempc * 9.0)/ 5.0 + 32.0; 
-  //float humidity = 28; 
   dewptf = (dewPoints(tempf, humidity)); 
   dewptc = ((dewptf - 32)/9)*5;
   
-  //check sensor data
+  //print sensor data
   Serial.println("+++++++++++++++++++++++++");
   Serial.print("temp *F = ");
   Serial.println(tempf);
@@ -260,13 +262,13 @@ if (client.connect(server, 80))
   //Serial.print("Wind Speed mph = ");
   //Serial.println(windspeed);
 
-  screenAdd("Post Data to WU");
-  
 
   
   //Send data to Weather Underground  
 
-  Serial.println("Send to WU Sensor Values");
+  screenAdd("Post Data to WU");
+
+  Serial.println("Post Data to WU");
   Serial.print("connecting to ");
   Serial.println(host);
   
@@ -338,6 +340,11 @@ if (client.connect(server, 80))
   strcpy(post,buff);
   screenAdd(strcat(pre,post));
 
+  dtostrf(dewptc,4,2,buff);
+  strcpy(pre,"Dew Point C: ");
+  strcpy(post,buff);
+  screenAdd(strcat(pre,post));
+
   // Thingspeak
 
   ThingSpeak.setField(1,tempc);
@@ -390,15 +397,19 @@ void screenAdd(char text[25]) {
     strcpy(showLine[1], text);  
   }else if (showCount==2){
     strcpy(showLine[2], text); 
+  }else if (showCount==3){
+    strcpy(showLine[3], text); 
   }else{
     strcpy(showLine[0], showLine[1]);
     strcpy(showLine[1], showLine[2]);
-    strcpy(showLine[2], text);
+    strcpy(showLine[2], showLine[3]);
+    strcpy(showLine[3], text);
   }
   // Content
   display.drawString(5, 15, showLine[0]);
-  display.drawString(5, 30, showLine[1]);
-  display.drawString(5, 45, showLine[2]);
+  display.drawString(5, 25, showLine[1]);
+  display.drawString(5, 35, showLine[2]);
+  display.drawString(5, 45, showLine[3]);
   
   display.display();
   showCount++;
