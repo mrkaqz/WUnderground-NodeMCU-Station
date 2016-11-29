@@ -26,7 +26,7 @@ SSD1306Wire display(I2C_DISPLAY_ADDRESS, SDA_PIN, SDC_PIN);
 
 
 ///////////////// Wifi
-const char* ssid     = "mixen-ap-f2"; 
+const char* ssid     = "mixen-ap-f1"; 
 const char* password = "mixensensagri";
 WiFiClient client;
 IPAddress ip;
@@ -46,8 +46,8 @@ void printBME280CalculatedData(Stream* client);
 ///////////////Weather UnderGround 
 char host [] = "weatherstation.wunderground.com";  
 char WEBPAGE [] = "GET /weatherstation/updateweatherstation.php?";
-char ID [] = "IOMKRET2";
-char PASSWORD [] = "4j19zv3n";
+char ID [] = "IBANGKOK207";
+char PASSWORD [] = "p0qayqgs";
 
 // ThingSpeak
 
