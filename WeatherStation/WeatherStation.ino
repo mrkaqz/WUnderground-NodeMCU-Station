@@ -104,11 +104,11 @@ void setup() {
     display.display();
     counter++;
     if (counter >= 50) {
-      ESP.restart();
       Serial.println("");
       Serial.println("Cannot connect to WiFi");
       Serial.println("Restarting...");
-      delay(2000);      
+      delay(2000);
+      ESP.restart();      
       } 
     delay(1000);
   }
