@@ -100,10 +100,16 @@ void setup() {
     
     display.clear();
     display.drawString(64, 15, "Connecting to WiFi");
-    display.drawProgressBar(10, 40, 100, 10, counter*5);
+    display.drawProgressBar(10, 40, 100, 10, counter*2);
     display.display();
     counter++;
-    if (counter > 20) {counter=0;} 
+    if (counter >= 50) {
+      ESP.restart();
+      Serial.println("");
+      Serial.println("Cannot connect to WiFi");
+      Serial.println("Restarting...");
+      delay(2000);      
+      } 
     delay(1000);
   }
 
